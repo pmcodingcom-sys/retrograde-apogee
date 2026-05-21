@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบถ่ายรูปใบอนุญาต (กล้องป๊อปอัป)</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS (for quick sleek styling) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Sarabun', 'sans-serif'],
+          },
+          colors: {
+            pastel: {
+              blue: '#E0F2FE',
+              'blue-dark': '#0369A1',
+              pink: '#FCE7F3',
+              'pink-dark': '#BE185D',
+              purple: '#F3E8FF',
+              'purple-dark': '#6B21A8',
+              green: '#DCFCE7',
+              'green-dark': '#15803D'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.06);
+    }
+    .video-container {
+      position: relative;
+      overflow: hidden;
+      transform: translateZ(0);
+    }
+  </style>
+</head>
+<body class="p-4 font-sans text-gray-800 antialiased">
+  <div class="w-full max-w-md glass-panel rounded-[32px] p-6 flex flex-col items-center">
+    <!-- Header -->
+    <div class="w-full text-center mb-4">
+      <div class="inline-flex p-3 bg-pastel-blue text-pastel-blue-dark rounded-2xl mb-2">
+        <svg class="w-6 h-6 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      </div>
+      <h1 class="text-lg font-bold text-gray-800">กล้องถ่ายรูปใบอนุญาต</h1>
+      <p class="text-xs text-gray-500 mt-1">กรุณาวางใบอนุญาตให้อยู่ในกรอบกล้องและถ่ายภาพ</p>
+    </div>
+    <!-- Camera Device Selector -->
+    <div class="w-full mb-4 hidden" id="deviceSelectorContainer">
+      <label for="videoSource" class="block text-[11px] font-semibold text-gray-500 mb-1">เลือกกล้อง:</label>
+      <select id="videoSource" onchange="startCameraStream()" class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-300">
+        <!-- Devices list will populate here -->
+      </select>
+    </div>
+    <!-- Camera Viewport Card -->
+    <div class="w-full aspect-[4/3] bg-black rounded-2xl overflow-hidden relative shadow-inner video-container mb-6">
+      
+      <!-- Video Element -->
+      <video id="videoElement" class="w-full h-full object-cover" autoplay playsinline></video>
+      
+      <!-- Captured Image Preview (Hidden by default) -->
+      <img id="imagePreview" class="w-full h-full object-cover hidden" alt="รูปที่ถ่าย">
+      
+      <!-- Hidden Canvas for capturing -->
+      <canvas id="captureCanvas" class="hidden"></canvas>
+      
+      <!-- Loading Overlay -->
+      <div id="loadingOverlay" class="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-white p-4 text-center">
+        <div class="w-10 h-10 border-4 border-pastel-blue border-t-pastel-blue-dark rounded-full animate-spin mb-3"></div>
+        <p class="text-xs font-semibold">กำลังเชื่อมต่อกล้อง...</p>
+      </div>
+      <!-- Permission Denied Overlay -->
+      <div id="permissionOverlay" class="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-white p-6 text-center hidden">
+        <svg class="w-12 h-12 text-red-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <h3 class="text-sm font-bold text-red-300">เข้าถึงกล้องไม่ได้</h3>
+        <p class="text-[11px] text-gray-400 mt-2 leading-relaxed">กรุณาอนุญาตสิทธิ์การใช้กล้องในเบราว์เซอร์ของคุณ หรือลองตรวจสอบการเชื่อมต่อกล้องใหม่</p>
+        <button onclick="requestCameraPermissions()" class="mt-4 px-4 py-2 bg-pastel-blue text-pastel-blue-dark rounded-xl text-xs font-bold hover:bg-pastel-blue/80 transition-all">
+          ขอสิทธิ์ใช้งานอีกครั้ง
+        </button>
+      </div>
+      <!-- Focus Overlay (Only shown on active camera) -->
+      <div id="focusOverlay" class="absolute inset-4 border border-white/30 rounded-xl pointer-events-none flex items-center justify-center">
+        <div class="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-white/60"></div>
+        <div class="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-white/60"></div>
+        <div class="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-white/60"></div>
+        <div class="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-white/60"></div>
+        <span class="text-[10px] text-white/50 bg-black/40 px-2 py-0.5 rounded-full font-mono uppercase tracking-wider">PREVIEW</span>
+      </div>
+    </div>
+    <!-- Action Buttons -->
+    <div class="w-full flex flex-col gap-2">
+      
+      <!-- Capture View buttons -->
+      <div id="captureModeButtons" class="w-full flex justify-center">
+        <button onclick="takeSnapshot()" class="w-16 h-16 bg-white hover:bg-pastel-blue border-4 border-pastel-blue-dark rounded-full flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 shadow-md">
+          <div class="w-10 h-10 bg-pastel-blue-dark hover:bg-sky-600 rounded-full transition-colors"></div>
+        </button>
+      </div>
+      <!-- Accept / Redo buttons (Hidden by default) -->
+      <div id="confirmModeButtons" class="w-full flex gap-3 hidden">
+        <button onclick="redoSnapshot()" class="flex-1 py-3 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1">
+          🔄 ถ่ายใหม่
+        </button>
+        <button onclick="confirmAndSend()" class="flex-1 py-3 bg-pastel-green text-pastel-green-dark hover:bg-pastel-green/80 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1 shadow-sm">
+          ✅ ตกลง (ใช้รูปนี้)
+        </button>
+      </div>
+      <!-- Cancel and close -->
+      <button onclick="window.close()" class="w-full py-2.5 text-xs text-gray-400 hover:text-gray-600 transition-colors mt-2 text-center">
+        ยกเลิกและปิดหน้าต่าง
+      </button>
+    </div>
+  </div>
+  <script>
+    let localStream = null;
+    let base64CapturedImage = '';
+    // Initialize camera on load
+    window.addEventListener('DOMContentLoaded', () => {
+      // Check if opener exists
+      if (!window.opener) {
+        console.warn("ไม่ได้เปิดผ่านหน้าเว็บหลัก การส่งข้อมูลอาจไม่ทำงาน");
+      }
+      requestCameraPermissions();
+    });
+    /**
+     * Ask for camera permission and load sources
+     */
+    async function requestCameraPermissions() {
+      showOverlay('loadingOverlay');
+      hideOverlay('permissionOverlay');
+      
+      try {
+        // Enforce secure HTTPS check
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+          console.warn("การใช้งานกล้องในเบราว์เซอร์จำเป็นต้องรันบน HTTPS");
+        }
+        // Trigger initial request
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach(track => track.stop()); // Stop immediately just to get permissions
+        
+        // Enumerate video devices
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        
+        const sourceSelect = document.getElementById('videoSource');
+        sourceSelect.innerHTML = '';
+        
+        if (videoDevices.length > 0) {
+          videoDevices.forEach((device, index) => {
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.text = device.label || `กล้องที่ ${index + 1}`;
+            sourceSelect.appendChild(option);
+          });
+          
+          if (videoDevices.length > 1) {
+            document.getElementById('deviceSelectorContainer').classList.remove('hidden');
+          }
+        }
+        
+        await startCameraStream();
+      } catch (err) {
+        console.error("Camera permission denied:", err);
+        hideOverlay('loadingOverlay');
+        showOverlay('permissionOverlay');
+      }
+    }
+    /**
+     * Start video stream with selected deviceId
+     */
+    async function startCameraStream() {
+      showOverlay('loadingOverlay');
+      stopCurrentStream();
+      
+      const sourceSelect = document.getElementById('videoSource');
+      const deviceId = sourceSelect.value;
+      const constraints = {
+        video: deviceId ? { deviceId: { exact: deviceId }, width: 640, height: 480 } : { facingMode: 'environment', width: 640, height: 480 }
+      };
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        localStream = stream;
+        
+        const video = document.getElementById('videoElement');
+        video.srcObject = stream;
+        video.classList.remove('hidden');
+        
+        // Reset preview states
+        document.getElementById('imagePreview').classList.add('hidden');
+        document.getElementById('focusOverlay').classList.remove('hidden');
+        
+        hideOverlay('loadingOverlay');
+        
+        // Mode buttons
+        document.getElementById('captureModeButtons').classList.remove('hidden');
+        document.getElementById('confirmModeButtons').classList.add('hidden');
+      } catch (err) {
+        console.error("Failed to start camera stream:", err);
+        hideOverlay('loadingOverlay');
+        showOverlay('permissionOverlay');
+      }
+    }
+    /**
+     * Stop ongoing camera track
+     */
+    function stopCurrentStream() {
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+    }
+    /**
+     * Snapshot photo
+     */
+    function takeSnapshot() {
+      const video = document.getElementById('videoElement');
+      const canvas = document.getElementById('captureCanvas');
+      const img = document.getElementById('imagePreview');
+      
+      if (localStream) {
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Convert to base64
+        base64CapturedImage = canvas.toDataURL('image/jpeg', 0.85);
+        
+        // Render preview
+        img.src = base64CapturedImage;
+        img.classList.remove('hidden');
+        video.classList.add('hidden');
+        document.getElementById('focusOverlay').classList.add('hidden');
+        
+        // Stop stream to release camera hardware
+        stopCurrentStream();
+        
+        // Toggle action buttons
+        document.getElementById('captureModeButtons').classList.add('hidden');
+        document.getElementById('confirmModeButtons').classList.remove('hidden');
+      }
+    }
+    /**
+     * Redo snapshot
+     */
+    function redoSnapshot() {
+      base64CapturedImage = '';
+      startCameraStream();
+    }
+    /**
+     * Confirm and send base64 data to parent window
+     */
+    function confirmAndSend() {
+      if (base64CapturedImage) {
+        if (window.opener) {
+          // Send message to parent
+          window.opener.postMessage({
+            type: 'CAMERA_CAPTURE',
+            image: base64CapturedImage
+          }, '*');
+          
+          window.close();
+        } else {
+          alert("ไม่พบหน้าจอระบบหลักที่จะรับรูปถ่าย กรุณาลองเปิดกล้องใหม่อีกครั้ง");
+        }
+      }
+    }
+    // Helper functions
+    function showOverlay(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+    
+    function hideOverlay(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
